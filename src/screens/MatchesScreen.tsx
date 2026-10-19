@@ -6,6 +6,7 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { FavoriteButton } from '../components/FavoriteButton';
@@ -115,6 +116,7 @@ async function fetchMatches(): Promise<Match[]> {
 export function MatchesScreen() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
+  const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,10 +147,25 @@ export function MatchesScreen() {
     void load('initial');
   }, [load]);
 
-  const visible = useMemo(
-    () => matches.filter((match) => matchesFilter(match, filter)),
-    [matches, filter],
-  );
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    return matches.filter((match) => {
+      if (!matchesFilter(match, filter)) return false;
+      if (!q) return true;
+
+      const haystack = [
+        match.home.name,
+        match.home.city,
+        match.away.name,
+        match.away.city,
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return haystack.includes(q);
+    });
+  }, [matches, filter, query]);
 
   if (loading && matches.length === 0) {
     return (
@@ -190,6 +207,29 @@ export function MatchesScreen() {
         {updatedAt ? <UpdatedAgo since={updatedAt} /> : null}
       </View>
 
+      <View style={styles.searchRow}>
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Поиск по команде"
+          placeholderTextColor="#9ca3af"
+          style={styles.searchInput}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+        />
+        {query.length > 0 ? (
+          <Pressable
+            onPress={() => setQuery('')}
+            accessibilityRole="button"
+            accessibilityLabel="Очистить поиск"
+            style={styles.searchClear}
+          >
+            <Text style={styles.searchClearText}>✕</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       {error ? (
         <View style={styles.inlineError}>
           <Text style={styles.muted}>{error}</Text>
@@ -226,11 +266,17 @@ export function MatchesScreen() {
         ListEmptyComponent={
           <View style={styles.centered}>
             <Text style={styles.errorTitle}>
-              {matches.length === 0 ? 'Матчей пока нет' : 'Нет матчей в этом фильтре'}
+              {matches.length === 0
+                ? 'Матчей пока нет'
+                : query.trim()
+                ? 'Ничего не найдено'
+                : 'Нет матчей в этом фильтре'}
             </Text>
             <Text style={styles.muted}>
               {matches.length === 0
                 ? 'Попробуйте обновить список позже'
+                : query.trim()
+                ? `По запросу «${query.trim()}» матчей нет`
                 : 'Живые и перенесённые матчи видны во вкладке «Все»'}
             </Text>
           </View>
@@ -283,6 +329,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#2563eb',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#111827',
+  },
+  searchClear: {
+    padding: 4,
+    marginLeft: 4,
+  },
+  searchClearText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '600',
   },
   filters: {
     flexDirection: 'row',
